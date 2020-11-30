@@ -1,0 +1,435 @@
+# Predicting and visualizing breast cancer diagnosis based on available numerical data
+
+## Data description
+Each row of the data corresponds to breast cancer cells of a patient. Each column contains measurement data of all the cells of a patient and one column contains the diagnosis (Malignant/Benign) of the patient.
+
+The database contains all numerical variables except one categorical variable: diagnosis
+```{r}
+'Please uncomment and install packages as neccessary'
+
+'install.packages("randomForest")
+install.packages("Amelia")
+install.packages("caTools")
+install.packages("rpart.plot")
+install.packages("gridExtra")
+install.packages("dplyr")
+install.packages("stringr")
+install.packages("rmarkdown")
+install.packages("caTools")
+install.packages("rpart.plot")
+install.packages("corrplot")
+install.packages("Hmisc")
+install.packages("class")
+install.packages("e1071")
+install.packages("neuralnet")
+install.packages("arm")
+install.packages("ggpmisc")'
+
+library(gridExtra)
+library(randomForest)
+library(Amelia)
+library(dplyr)
+library(ggplot2)
+library(rmarkdown)
+library(caTools)
+library(stringr)
+library(readr) 
+library(rpart.plot)
+library(corrplot)
+library(Hmisc)
+library(class)
+library(e1071)
+library(neuralnet)
+library(arm)
+library(ggpmisc)
+
+```
+
+## Displaying Data
+```{r}
+'reading the data file'
+cancer.df <- read.csv("data.csv", header = TRUE)
+
+'displaying the dataset'
+head(cancer.df)
+describe(cancer.df)
+missmap(cancer.df, main='Raw data', col=c("red","blue"), legend = FALSE)
+
+```
+
+## Cleaning Data
+```{r}
+cancer.df <- cancer.df[-c(33)] 
+head (cancer.df)
+any(is.na(cancer.df))
+missmap(cancer.df, main='Cleaned data', col=c("red","blue"), legend = FALSE)
+cancer.df$diagnosis <- as.factor(cancer.df$diagnosis)
+
+```
+
+## Analysing and Visualizing data
+```{r}
+'Corelation matrix HeatMap'
+corr_mat <- cor(cancer.df[,3:12])
+corrplot::corrplot(corr_mat, order = "hclust", tl.cex = 1, addrect = 8)
+
+```
+
+### Sample graphs showing details of Malignant and Benign cells having high correlation
+```{r}
+ggplot(cancer.df,
+       aes(area_mean, perimeter_mean)) + 
+       geom_point(aes(color=factor(diagnosis)),alpha=0.3) + 
+       scale_fill_discrete(name="diagnosis", breaks=c("0", "1"),
+                           labels=c("Malignant", "Benign")) + 
+       labs(title = "Area_Mean vs Perimeter_Mean")
+
+ggplot(cancer.df,
+       aes(smoothness_se, symmetry_mean)) +
+       geom_point(aes(color=factor(diagnosis)),alpha=0.3) +
+       scale_fill_discrete(name="diagnosis", breaks=c("0", "1"),
+                           labels=c("Malignant", "Benign")) + 
+       labs(title = "Smoothness_Standard_Error vs Symmetry_Mean")
+
+```
+
+### Distribution of Radius_Mean of Malignant annd benign cells
+```{r}
+'splitting malignant and benign data'
+benign.df <- cancer.df[cancer.df$diagnosis == "B",]
+malign.df <- cancer.df[cancer.df$diagnosis == "M",]
+
+ggplot(cancer.df, 
+       aes(x=radius_mean, color= diagnosis, fill = diagnosis, alpha = 0.3)) +                                      geom_histogram(binwidth = 0.1) +
+       geom_vline(data=malign.df, aes(xintercept=mean(radius_mean), 
+                                      color = diagnosis), 
+                                      linetype="dashed")+
+       geom_vline(data=benign.df, aes(xintercept=mean(radius_mean),
+                                      color = diagnosis), 
+                                      linetype="dashed")
+
+```
+
+
+```{r}
+'comparing means and outliers with boxplot'
+ggplot(cancer.df,
+       aes(x=diagnosis, y=radius_mean, fill = diagnosis)) +
+      geom_boxplot() +
+      xlab("Diagnosis")+
+      ylab("Radius Mean")
+  
+```
+### Summary of distributions of significant variables based on correlation
+```{r}
+
+p1 <- ggplot(cancer.df, aes(x=diagnosis, y=radius_mean, 
+                      fill = diagnosis)) +
+             geom_violin() +
+             geom_boxplot(width=0.1)+
+             xlab("Diagnosis")+
+             ylab("Radius Mean")+
+             ggtitle("Distribution of Radius mean for different diagnosis")+
+             geom_hline(data=cancer.df, aes(yintercept=mean(radius_mean)), 
+                                      linetype="dashed")
+
+p2 <- ggplot(cancer.df, aes(x=diagnosis, y=texture_mean, 
+                      fill = diagnosis)) +
+             geom_violin() +
+             geom_boxplot(width=0.1)+
+             xlab("Diagnosis")+
+             ylab("Texture Mean")+
+             ggtitle("Distribution of Texture Mean for different diagnosis")+
+             geom_hline(data=cancer.df, aes(yintercept=mean(cancer.df$texture_mean)), 
+                                      linetype="dashed")
+
+p3 <- ggplot(cancer.df, aes(x=cancer.df$diagnosis, y=cancer.df$perimeter_mean, 
+                      fill = cancer.df$diagnosis)) +
+             geom_violin() +
+             geom_boxplot(width=0.1)+
+             xlab("Diagnosis")+
+             ylab("Perimeter Mean")+
+             ggtitle("Distribution of Perimeter Mean for different diagnosis")+
+             geom_hline(data=cancer.df, aes(yintercept=mean(cancer.df$perimeter_mean)), 
+                                      linetype="dashed")
+
+p4 <- ggplot(cancer.df, aes(x=cancer.df$diagnosis, y=cancer.df$area_mean, 
+                      fill = cancer.df$diagnosis)) +
+             geom_violin() +
+             geom_boxplot(width=0.1)+
+             xlab("Diagnosis")+
+             ylab("Area Mean")+
+             ggtitle("Distribution of Area Mean for different diagnosis")+
+             geom_hline(data=cancer.df, aes(yintercept=mean(cancer.df$area_mean)), 
+                                      linetype="dashed")
+
+p5 <- ggplot(cancer.df, aes(x=cancer.df$diagnosis, y=cancer.df$smoothness_mean, 
+                      fill = cancer.df$diagnosis)) +
+             geom_violin() +
+             geom_boxplot(width=0.1)+
+             xlab("Diagnosis")+
+             ylab("Smoothness Mean")+
+             ggtitle("Distribution of Smoothness Mean for different diagnosis")+
+             geom_hline(data=cancer.df, aes(yintercept=mean(cancer.df$smoothness_mean)), 
+                                      linetype="dashed")
+
+p6 <- ggplot(cancer.df, aes(x=cancer.df$diagnosis, y=cancer.df$compactness_mean, 
+                      fill = cancer.df$diagnosis)) +
+             geom_violin() +
+             geom_boxplot(width=0.1)+
+             xlab("Diagnosis")+
+             ylab("Compactness Mean")+
+             ggtitle("Distribution of Compactness Mean for different diagnosis")+
+             geom_hline(data=cancer.df, aes(yintercept=mean(cancer.df$compactness_mean)), 
+                                      linetype="dashed")
+
+p7 <- ggplot(cancer.df, aes(x=cancer.df$diagnosis, y=cancer.df$concavity_mean, 
+                      fill = cancer.df$diagnosis)) +
+             geom_violin() +
+             geom_boxplot(width=0.1)+
+             xlab("Diagnosis")+
+             ylab("Concavity Mean")+
+             ggtitle("Distribution of Concavity Mean for different diagnosis")+
+             geom_hline(data=cancer.df, aes(yintercept=mean(cancer.df$concavity_mean)), 
+                                      linetype="dashed")
+
+p8 <- ggplot(cancer.df, aes(x=cancer.df$diagnosis, y=cancer.df$concave.points_mean, 
+                      fill = cancer.df$diagnosis)) +
+             geom_violin() +
+             geom_boxplot(width=0.1)+
+             xlab("Diagnosis")+
+             ylab("Concave Points Mean")+
+             ggtitle("Distribution of Concave Points Mean for different diagnosis")+
+             geom_hline(data=cancer.df, aes(yintercept=mean(cancer.df$concave.points_mean)), 
+                                      linetype="dashed")
+
+p9 <- ggplot(cancer.df, aes(x=cancer.df$diagnosis, y=cancer.df$symmetry_mean, 
+                      fill = cancer.df$diagnosis)) +
+             geom_violin() +
+             geom_boxplot(width=0.1)+
+             xlab("Diagnosis")+
+             ylab("Symmetry Mean")+
+             ggtitle("Distribution of Symmetry Mean for different diagnosis")+
+             geom_hline(data=cancer.df, aes(yintercept=mean(cancer.df$symmetry_mean)), 
+                                      linetype="dashed")
+
+p10 <- ggplot(cancer.df, aes(x=cancer.df$diagnosis, y=cancer.df$fractal_dimension_mean, 
+                      fill = cancer.df$diagnosis)) +
+             geom_violin() +
+             geom_boxplot(width=0.1)+
+             xlab("Diagnosis")+
+             ylab("Fractal Dimension Mean")+
+             ggtitle("Distribution of Fractal Dimension Mean for different diagnosis")+
+             geom_hline(data=cancer.df, aes(yintercept=mean(cancer.df$fractal_dimension_mean)), 
+                                      linetype="dashed")
+
+p1
+p2
+p3
+p4
+p5
+p6
+p7
+p8
+p9
+p10
+
+```
+
+
+```{r}
+cancer.df <- read.csv("data.csv", header = TRUE)
+
+cancer.df$X <- NULL
+cancer.df$ids <- cancer.df$id
+cancer.df$id <- NULL
+cancer.df$diagnosis <- as.factor(cancer.df$diagnosis)
+str(cancer.df)
+```
+
+## Understanding unacceptable error data
+```{r}
+
+'radius with standard error more than 10% of mean'
+error.df <- cancer.df[cancer.df$radius_se > 0.1*mean(cancer.df$radius_mean),]
+error.df$id <- 1:nrow(error.df)
+
+ggplot(error.df, aes(x=id, y=radius_mean, fill=diagnosis)) +
+  geom_bar(stat ="identity") +
+  geom_errorbar( aes(x=id, y=radius_mean, ymin=radius_mean-radius_se,
+                     ymax=radius_mean+radius_se), width=0.5, colour="pink",
+                    alpha=0.9, size=1.5) +
+  ggtitle("Radius standard error greater than 10% of mean") +
+  theme(plot.title = element_text(hjust = 0.5)) 
+  
+
+'texture with standard error more than 10% of mean'
+error.df <- cancer.df[cancer.df$texture_se > 0.1*mean(cancer.df$texture_mean),]
+error.df$id <- 1:nrow(error.df)
+
+ggplot(error.df, aes(x=id, y=texture_mean, fill=diagnosis)) +
+  geom_bar(stat ="identity") +
+  geom_errorbar( aes(x=id, y=texture_mean, ymin=texture_mean-texture_se,
+                     ymax=texture_mean+texture_se), width=0.5, colour="pink",
+                    alpha=0.9, size=1.5) +
+  ggtitle("Texture standard error greater than 10% of mean") +
+  theme(plot.title = element_text(hjust = 0.5))  
+
+
+'perimeter with standard error more than 10% of mean'
+error.df <- cancer.df[cancer.df$perimeter_se > 0.1*mean(cancer.df$perimeter_mean),]
+error.df$id <- 1:nrow(error.df)
+
+ggplot(error.df, aes(x=id, y=perimeter_mean, fill=diagnosis)) +
+  geom_bar(stat ="identity") +
+  geom_errorbar( aes(x=id, y=perimeter_mean, ymin=perimeter_mean-perimeter_se,
+                     ymax=perimeter_mean+perimeter_se), width=0.5, colour="pink",
+                    alpha=0.9, size=1.5) +
+  ggtitle("Perimeter standard error greater than 10% of mean") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+'area with standard error more than 10% of mean'
+error.df <- cancer.df[cancer.df$area_se > 0.1*mean(cancer.df$area_mean),]
+error.df$id <- 1:nrow(error.df)
+
+ggplot(error.df, aes(x=id, y=area_mean, fill=diagnosis)) +
+  geom_bar(stat ="identity") +
+  geom_errorbar( aes(x=id, y=area_mean, ymin=area_mean-area_se,
+                     ymax=area_mean+area_se), width=0.1, colour="pink",
+                    alpha=0.9, size=0.8) +
+  ggtitle("Area standard error greater than 10% of mean") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+'smoothness with standard error more than 10% of mean'
+error.df <- cancer.df[cancer.df$smoothness_se > 0.1*mean(cancer.df$smoothness_mean),]
+error.df$id <- 1:nrow(error.df)
+
+ggplot(error.df, aes(x=id, y=smoothness_mean, fill=diagnosis)) +
+  geom_bar(stat ="identity") +
+  geom_errorbar( aes(x=id, y=smoothness_mean, ymin=smoothness_mean-smoothness_se,
+                     ymax=smoothness_mean+smoothness_se), width=0.5, colour="pink",
+                    alpha=0.9, size=1) +
+  ggtitle("Smoothness standard error greater than 10% of mean") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+For variables (compactness, conacavity, symmetry...), the error margin can't be considered as a factor. Because these variables are relatively less adverse and almost all the data entails high standard error.
+
+#Logistic Regression
+```{r}
+split <- sample.split(cancer.df$diagnosis, Split = 0.7)
+training_set <- subset(cancer.df, split == T)
+testing_set <- subset(cancer.df, split == F)
+
+regression.df <- bayesglm(formula=diagnosis ~ . , family = binomial(link='logit'),
+                     maxit = 100, data = training_set)
+
+summary(regression.df)
+
+probability.df <- predict(regression.df,newdata=testing_set[2:32],type='response')
+
+fd <-table(testing_set$diagnosis, probability.df > 0.5)
+fd
+
+fd.t <-sum(diag(fd))/sum(fd)
+print(fd.t)
+```
+
+#Random Forest
+```{r}
+rforest.df <- randomForest(diagnosis ~., data = training_set)
+
+p.value <- predict(rforest.df, testing_set[2:32])
+rd <- table(p.value, testing_set$diagnosis)
+print(rd)
+
+rd.t <-sum(diag(rd))/sum(rd)
+print(rd.t)
+```
+
+#KNN
+```{r}
+normalize <- function(x){
+  return((x-min(x))/(max(x)-min(x)))
+}
+
+cancer.df.k<- as.data.frame(lapply(cancer.df[2:30],normalize))
+cancer.df.k$diagnosis <- cancer.df$diagnosis
+
+split <- sample.split(cancer.df.k$diagnosis, Split = 0.7)
+training_set_k <- subset(cancer.df.k, split == T)
+testing_set_k <- subset(cancer.df.k, split == F)
+
+p.cancer.df <- knn(training_set_k[1:29],testing_set_k[1:29],training_set_k$diagnosis,k=1)
+
+mean(testing_set_k$diagnosis != p.cancer.df)
+
+p.cancer.df <-NULL
+er <-NULL
+
+for(i in 1:10){
+  p.cancer.df <- p.df<- knn(training_set_k[1:29],testing_set_k[1:29],training_set_k$diagnosis,k=i)
+  er[i] <- mean(testing_set_k$diagnosis != p.cancer.df)
+}
+
+k.val <- 1:10
+ed <- data.frame(er,k.val)
+
+pl <- ggplot(ed,aes(x=k.val,y=er)) + geom_point()
+pl + geom_line(lty=1,color='blue')
+
+p.cancer.df <- knn(training_set_k[1:29],testing_set_k[1:29],training_set_k$diagnosis,k=5)
+mean(testing_set_k$diagnosis != p.cancer.df)
+
+c_mat <-table(testing_set_k$diagnosis, p.cancer.df)
+print(c_mat)
+
+c_mat.t <-sum(diag(c_mat))/sum(c_mat)
+print(c_mat.t)
+```
+
+#Neural Network
+```{r}
+normalize <- function(x){
+  return((x-min(x))/(max(x)-min(x)))
+}
+
+cancer.df.k<- as.data.frame(lapply(cancer.df[2:31],normalize))
+cancer.df.k$diagnosis <- cancer.df$diagnosis
+cancer.df.k$diagnosis <- as.numeric(cancer.df.k$diagnosis)
+
+loop <- function(can){
+  for(i in 1:length(can)){
+    if(can[i] == 1){
+      can[i] <- 0
+    }else{
+      can <- 1
+    }
+  }
+  return(can)
+}
+
+cancer.df.k$diagnosis <-sapply(cancer.df.k$diagnosis,loop)
+
+split <- sample.split(cancer.df.k$diagnosis, Split = 0.7)
+training_set_k <- subset(cancer.df.k, split == T)
+testing_set_k <- subset(cancer.df.k, split == F)
+
+nn <- neuralnet(diagnosis ~ radius_mean + texture_mean + perimeter_mean + area_mean + 
+                  smoothness_mean + compactness_mean + concavity_mean + concave.points_mean + 
+                  symmetry_mean + fractal_dimension_mean + radius_se + texture_se + 
+                  perimeter_se + area_se + smoothness_se + compactness_se + 
+                  concavity_se + concave.points_se + symmetry_se + fractal_dimension_se + 
+                  radius_worst + texture_worst + perimeter_worst + area_worst + 
+                  smoothness_worst + compactness_worst + concavity_worst + 
+                  concave.points_worst + symmetry_worst + fractal_dimension_worst, data=training_set_k, hidden = c(5,3), linear.output = FALSE)
+
+p.nn.val <- compute(nn, testing_set_k[,1:30])
+
+p <- sapply(p.nn.val$net.result,round)
+
+val <-table(p, testing_set_k$diagnosis)
+val.t <- sum(diag(val))/sum(val)
+print(val.t)
+```
